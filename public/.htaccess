@@ -1,0 +1,39 @@
+# Redirect www to non-www (choose one)
+RewriteEngine On
+RewriteCond %{HTTP_HOST} ^www\.satta-samrat\.com [NC]
+RewriteRule ^(.*)$ https://satta-samrat.com/$1 [L,R=301]
+
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [L,R=301]
+
+# SPA routing - serve index.html for all non-file routes
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [QSA,L]
+
+# Cache static assets
+<FilesMatch "\.(css|js|svg|png|jpg|jpeg|gif|ico|webp|woff2?)$">
+  Header set Cache-Control "public, max-age=31536000, immutable"
+</FilesMatch>
+
+# Cache HTML
+<FilesMatch "\.(html)$">
+  Header set Cache-Control "public, max-age=0, must-revalidate"
+</FilesMatch>
+
+# Block bad bots
+RewriteCond %{HTTP_USER_AGENT} (ahrefs|majestic|rogerbot|semrush) [NC]
+RewriteRule .* - [F,L]
+
+# Security headers
+Header always set X-Content-Type-Options "nosniff"
+Header always set X-Frame-Options "SAMEORIGIN"
+Header always set X-XSS-Protection "1; mode=block"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+# Enable compression
+AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+
+# Prevent directory listing
+Options -Indexes
