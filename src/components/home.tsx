@@ -101,14 +101,17 @@ export default function Home({ initialMonth, initialYear }: { initialMonth: stri
 
   const fetchToday = useCallback(async () => {
     try {
-      const res = await fetch(`${RESULTS_API}/today`);
-      if (res.ok) setTodayData(await res.json());
+      const res = await fetch(`${RESULTS_API}/today`, { cache: "no-store" });
+      if (res.ok) {
+        setTodayData(await res.json());
+        setNow(new Date());
+      }
     } catch {}
   }, []);
 
   const fetchMonthly = useCallback(async () => {
     try {
-      const res = await fetch(`${RESULTS_API}/monthly?month=${chartMonth}&year=${chartYear}`);
+      const res = await fetch(`${RESULTS_API}/monthly?month=${chartMonth}&year=${chartYear}`, { cache: "no-store" });
       if (res.ok) {
         const data: MonthlyRow[] = await res.json();
         setMonthlyChart(data);
@@ -121,7 +124,7 @@ export default function Home({ initialMonth, initialYear }: { initialMonth: stri
 
   const fetchYears = useCallback(async () => {
     try {
-      const res = await fetch(`${RESULTS_API}/years`);
+      const res = await fetch(`${RESULTS_API}/years`, { cache: "no-store" });
       if (res.ok) {
         const years = await res.json();
         setAvailableYears(years.length > 0 ? years : [initialYear]);
@@ -131,7 +134,7 @@ export default function Home({ initialMonth, initialYear }: { initialMonth: stri
 
   const fetchAds = useCallback(async () => {
     try {
-      const res = await fetch(`${ADMIN_API}/ads`);
+      const res = await fetch(`${ADMIN_API}/ads`, { cache: "no-store" });
       if (res.ok) setAds(await res.json());
     } catch {}
   }, []);
@@ -147,23 +150,45 @@ export default function Home({ initialMonth, initialYear }: { initialMonth: stri
   }, [fetchToday]);
 
   useEffect(() => {
+    const interval = setInterval(fetchMonthly, 30000);
+    return () => clearInterval(interval);
+  }, [fetchMonthly]);
+
+  useEffect(() => {
+    const interval = setInterval(fetchYears, 60000);
+    return () => clearInterval(interval);
+  }, [fetchYears]);
+
+  useEffect(() => {
+    const interval = setInterval(fetchAds, 60000);
+    return () => clearInterval(interval);
+  }, [fetchAds]);
+
+  useEffect(() => {
     if (!urlRecord) {
       setRecordChartMonthly([]);
       setRecordChartKeys([]);
       setRecordChartLoading(false);
       return;
     }
-    setRecordChartLoading(true);
-    fetch(`${RESULTS_API}/monthly?month=${chartMonth}&year=${chartYear}&include=${encodeURIComponent(urlRecord)}`)
-      .then(res => res.ok ? res.json() : [])
-      .then((data: MonthlyRow[]) => {
-        setRecordChartMonthly(data);
-        if (data.length > 0) {
-          setRecordChartKeys(Object.keys(data[0]).filter(k => k !== "date" && k !== "sunday"));
-        }
-        setRecordChartLoading(false);
-      })
-      .catch(() => { setRecordChartLoading(false); });
+    let cancelled = false;
+    const load = () => {
+      setRecordChartLoading(true);
+      fetch(`${RESULTS_API}/monthly?month=${chartMonth}&year=${chartYear}&include=${encodeURIComponent(urlRecord)}`, { cache: "no-store" })
+        .then(res => res.ok ? res.json() : [])
+        .then((data: MonthlyRow[]) => {
+          if (cancelled) return;
+          setRecordChartMonthly(data);
+          if (data.length > 0) {
+            setRecordChartKeys(Object.keys(data[0]).filter(k => k !== "date" && k !== "sunday"));
+          }
+          setRecordChartLoading(false);
+        })
+        .catch(() => { if (!cancelled) setRecordChartLoading(false); });
+    };
+    load();
+    const interval = setInterval(load, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [urlRecord, chartMonth, chartYear]);
 
   function sectionGames(section: string) {
